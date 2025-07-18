@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Calculator, BookOpen, DollarSign, FileText } from "lucide-react";
+import { Send, Calculator, BookOpen, DollarSign, FileText, Settings, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +7,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { ChatMessage } from "./ChatMessage";
 import { TaxCalculator } from "./TaxCalculator";
+import { ApiKeyDialog } from "./ApiKeyDialog";
+import { OpenAIService } from "@/services/OpenAIService";
 import { useToast } from "@/hooks/use-toast";
 
 interface Message {
@@ -170,13 +172,15 @@ export const TaxChatbot = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      message: "👋 Hello! I'm your Income Tax Assistant. I can help you with:\n\n• Tax calculations and slabs\n• Deduction suggestions\n• ITR filing guidance\n• Tax regime comparison\n• Common tax terms\n\nWhat would you like to know about income tax today?",
+      message: "👋 Hello! I'm your Income Tax Assistant powered by AI. I can help you with:\n\n• Tax calculations and slabs\n• Deduction suggestions\n• ITR filing guidance\n• Tax regime comparison\n• Common tax terms\n• And ANY other questions you have!\n\n💡 For the best experience, set up your OpenAI API key using the settings button.\n\nWhat would you like to know today?",
       isBot: true,
       timestamp: new Date(),
     },
   ]);
   const [input, setInput] = useState("");
   const [showCalculator, setShowCalculator] = useState(false);
+  const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
+  const [isLoadingResponse, setIsLoadingResponse] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -196,16 +200,16 @@ export const TaxChatbot = () => {
     setMessages(prev => [...prev, newMessage]);
   };
 
-  const getBotResponse = (userMessage: string): string => {
+  const getBotResponse = async (userMessage: string): Promise<string> => {
     const lowerMessage = userMessage.toLowerCase();
     
-    // Check for specific keywords and return appropriate responses
+    // Check for specific keywords and return appropriate responses (EXACT SAME LOGIC)
     if (lowerMessage.includes("calculate") || lowerMessage.includes("tax calculator")) {
       setShowCalculator(true);
       return "I'll help you calculate your tax! Please use the calculator below to get your exact tax liability.";
     }
     
-    // Find matching response
+    // Find matching response from predefined responses (EXACT SAME LOGIC)
     for (const [key, response] of Object.entries(TAX_RESPONSES)) {
       if (lowerMessage.includes(key.toLowerCase()) || 
           key.toLowerCase().includes(lowerMessage) ||
@@ -214,7 +218,7 @@ export const TaxChatbot = () => {
       }
     }
 
-    // Handle specific tax terms
+    // Handle specific tax terms (EXACT SAME LOGIC)
     if (lowerMessage.includes("80c")) {
       return "Section 80C allows deductions up to ₹1,50,000 for investments like EPF, PPF, life insurance, ELSS mutual funds, and home loan principal repayment. This is only available in the old tax regime.";
     }
@@ -239,7 +243,26 @@ export const TaxChatbot = () => {
 💡 **Tip:** Calculate tax under both regimes and choose the beneficial one!`;
     }
 
-    // Default response for unrecognized queries
+    // NEW: Try OpenAI for unrecognized queries
+    const apiKey = OpenAIService.getApiKey();
+    if (apiKey) {
+      try {
+        const aiResponse = await OpenAIService.getChatResponse(
+          userMessage,
+          "You are a helpful Income Tax Assistant for India. Provide accurate, helpful responses about Indian income tax, deductions, tax slabs, ITR filing, and related topics. Use emojis and format your responses clearly. If the question is not tax-related, politely redirect to tax topics while still being helpful."
+        );
+        
+        if (aiResponse.success && aiResponse.response) {
+          return aiResponse.response;
+        } else {
+          console.warn('OpenAI API error:', aiResponse.error);
+        }
+      } catch (error) {
+        console.warn('Failed to get OpenAI response:', error);
+      }
+    }
+
+    // Fallback response (EXACT SAME AS BEFORE)
     return `I'd be happy to help with that! Here are some topics I can assist you with:
 
 💰 Tax calculations and slabs
@@ -249,30 +272,49 @@ export const TaxChatbot = () => {
 📚 Tax terminology (PAN, TDS, Form 16, etc.)
 📅 Important tax dates and deadlines
 
+${!apiKey ? '\n💡 **Tip:** Set up your OpenAI API key in settings to get answers to ANY question!' : ''}
+
 Could you please be more specific about what you'd like to know? You can also use the quick action buttons below for common queries.`;
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!input.trim()) return;
 
     // Add user message
     addMessage(input, false);
+    setIsLoadingResponse(true);
     
     // Get and add bot response
-    const response = getBotResponse(input);
-    setTimeout(() => {
-      addMessage(response, true);
-    }, 500);
+    try {
+      const response = await getBotResponse(input);
+      setTimeout(() => {
+        addMessage(response, true);
+        setIsLoadingResponse(false);
+      }, 500);
+    } catch (error) {
+      console.error('Error getting response:', error);
+      addMessage("Sorry, I encountered an error. Please try again.", true);
+      setIsLoadingResponse(false);
+    }
 
     setInput("");
   };
 
-  const handleQuickAction = (value: string) => {
+  const handleQuickAction = async (value: string) => {
     addMessage(value, false);
-    const response = getBotResponse(value);
-    setTimeout(() => {
-      addMessage(response, true);
-    }, 500);
+    setIsLoadingResponse(true);
+    
+    try {
+      const response = await getBotResponse(value);
+      setTimeout(() => {
+        addMessage(response, true);
+        setIsLoadingResponse(false);
+      }, 500);
+    } catch (error) {
+      console.error('Error getting response:', error);
+      addMessage("Sorry, I encountered an error. Please try again.", true);
+      setIsLoadingResponse(false);
+    }
   };
 
   const handleCalculationComplete = (result: string) => {
@@ -297,14 +339,27 @@ Could you please be more specific about what you'd like to know? You can also us
         {/* Header */}
         <Card className="mb-4 shadow-soft border-border/50">
           <CardHeader className="pb-4">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-gradient-to-r from-primary to-primary-glow flex items-center justify-center">
-                <Calculator className="h-5 w-5 text-white" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-gradient-to-r from-primary to-primary-glow flex items-center justify-center">
+                  <Bot className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl">Income Tax Assistant</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    AI-powered tax calculation companion {OpenAIService.getApiKey() ? '• API Connected' : '• Setup API for full features'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <CardTitle className="text-xl">Income Tax Assistant</CardTitle>
-                <p className="text-sm text-muted-foreground">Your friendly tax calculation companion</p>
-              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowApiKeyDialog(true)}
+                className="gap-2"
+              >
+                <Settings className="h-4 w-4" />
+                API Settings
+              </Button>
             </div>
           </CardHeader>
         </Card>
@@ -370,6 +425,18 @@ Could you please be more specific about what you'd like to know? You can also us
             </div>
           </div>
         </Card>
+
+        {/* API Key Dialog */}
+        <ApiKeyDialog
+          open={showApiKeyDialog}
+          onOpenChange={setShowApiKeyDialog}
+          onApiKeySet={() => {
+            toast({
+              title: "API Key Configured",
+              description: "OpenAI integration is now active! Ask me anything.",
+            });
+          }}
+        />
       </div>
     </div>
   );
