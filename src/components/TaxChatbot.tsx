@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { ChatMessage } from "./ChatMessage";
 import { TaxCalculator } from "./TaxCalculator";
 import { ApiKeyDialog } from "./ApiKeyDialog";
+import { GeminiApiKeyDialog } from "./GeminiApiKeyDialog";
 import { OpenAIService } from "@/services/OpenAIService";
 import { GeminiService } from "@/services/GeminiService";
 import { useToast } from "@/hooks/use-toast";
@@ -181,6 +182,7 @@ export const TaxChatbot = () => {
   const [input, setInput] = useState("");
   const [showCalculator, setShowCalculator] = useState(false);
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
+  const [showGeminiDialog, setShowGeminiDialog] = useState(false);
   const [isLoadingResponse, setIsLoadingResponse] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -365,15 +367,26 @@ Could you please be more specific about what you'd like to know? You can also us
                   </p>
                 </div>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowApiKeyDialog(true)}
-                className="gap-2"
-              >
-                <Settings className="h-4 w-4" />
-                API Settings
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowApiKeyDialog(true)}
+                  className="gap-2"
+                >
+                  <Settings className="h-4 w-4" />
+                  OpenAI
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowGeminiDialog(true)}
+                  className="gap-2"
+                >
+                  <Bot className="h-4 w-4" />
+                  Gemini
+                </Button>
+              </div>
             </div>
           </CardHeader>
         </Card>
@@ -440,7 +453,7 @@ Could you please be more specific about what you'd like to know? You can also us
           </div>
         </Card>
 
-        {/* API Key Dialog */}
+        {/* API Key Dialogs */}
         <ApiKeyDialog
           open={showApiKeyDialog}
           onOpenChange={setShowApiKeyDialog}
@@ -448,6 +461,17 @@ Could you please be more specific about what you'd like to know? You can also us
             toast({
               title: "API Key Configured",
               description: "OpenAI integration is now active! Ask me anything.",
+            });
+          }}
+        />
+        
+        <GeminiApiKeyDialog
+          open={showGeminiDialog}
+          onOpenChange={setShowGeminiDialog}
+          onApiKeySet={() => {
+            toast({
+              title: "Gemini Configured",
+              description: "Gemini integration is now active! Ask me anything.",
             });
           }}
         />
