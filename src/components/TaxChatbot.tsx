@@ -9,6 +9,7 @@ import { ChatMessage } from "./ChatMessage";
 import { TaxCalculator } from "./TaxCalculator";
 import { ApiKeyDialog } from "./ApiKeyDialog";
 import { OpenAIService } from "@/services/OpenAIService";
+import { GeminiService } from "@/services/GeminiService";
 import { useToast } from "@/hooks/use-toast";
 
 interface Message {
@@ -243,22 +244,35 @@ export const TaxChatbot = () => {
 💡 **Tip:** Calculate tax under both regimes and choose the beneficial one!`;
     }
 
-    // NEW: Try OpenAI for unrecognized queries
-    const apiKey = OpenAIService.getApiKey();
-    if (apiKey) {
+    // Try AI services for unrecognized queries
+    const openaiKey = OpenAIService.getApiKey();
+    const geminiKey = GeminiService.getApiKey();
+    
+    if (openaiKey || geminiKey) {
       try {
-        const aiResponse = await OpenAIService.getChatResponse(
-          userMessage,
-          "You are a helpful Income Tax Assistant for India. Provide accurate, helpful responses about Indian income tax, deductions, tax slabs, ITR filing, and related topics. Use emojis and format your responses clearly. If the question is not tax-related, politely redirect to tax topics while still being helpful."
-        );
+        const context = "You are a helpful Income Tax Assistant for India. Provide accurate, helpful responses about Indian income tax, deductions, tax slabs, ITR filing, and related topics. Use emojis and format your responses clearly. If the question is not tax-related, politely redirect to tax topics while still being helpful.";
         
-        if (aiResponse.success && aiResponse.response) {
-          return aiResponse.response;
-        } else {
-          console.warn('OpenAI API error:', aiResponse.error);
+        // Try OpenAI first, then Gemini as fallback
+        if (openaiKey) {
+          const aiResponse = await OpenAIService.getChatResponse(userMessage, context);
+          if (aiResponse.success && aiResponse.response) {
+            return aiResponse.response;
+          } else {
+            console.warn('OpenAI API error:', aiResponse.error);
+          }
+        }
+        
+        // Try Gemini if OpenAI failed or not available
+        if (geminiKey) {
+          const geminiResponse = await GeminiService.getChatResponse(userMessage, context);
+          if (geminiResponse.success && geminiResponse.response) {
+            return geminiResponse.response;
+          } else {
+            console.warn('Gemini API error:', geminiResponse.error);
+          }
         }
       } catch (error) {
-        console.warn('Failed to get OpenAI response:', error);
+        console.warn('Failed to get AI response:', error);
       }
     }
 
@@ -272,7 +286,7 @@ export const TaxChatbot = () => {
 📚 Tax terminology (PAN, TDS, Form 16, etc.)
 📅 Important tax dates and deadlines
 
-${!apiKey ? '\n💡 **Tip:** Set up your OpenAI API key in settings to get answers to ANY question!' : ''}
+${!(openaiKey || geminiKey) ? '\n💡 **Tip:** Set up your AI API key in settings to get answers to ANY question!' : ''}
 
 Could you please be more specific about what you'd like to know? You can also use the quick action buttons below for common queries.`;
   };
@@ -347,7 +361,7 @@ Could you please be more specific about what you'd like to know? You can also us
                 <div>
                   <CardTitle className="text-xl">Income Tax Assistant</CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    AI-powered tax calculation companion {OpenAIService.getApiKey() ? '• API Connected' : '• Setup API for full features'}
+                    AI-powered tax calculation companion {(OpenAIService.getApiKey() || GeminiService.getApiKey()) ? '• AI Connected' : '• Setup AI API for full features'}
                   </p>
                 </div>
               </div>

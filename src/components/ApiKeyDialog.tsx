@@ -3,6 +3,7 @@ import { Key, Eye, EyeOff, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { OpenAIService } from "@/services/OpenAIService";
+import { GeminiService } from "@/services/GeminiService";
 import { useToast } from "@/hooks/use-toast";
 
 interface ApiKeyDialogProps {
@@ -22,53 +24,96 @@ interface ApiKeyDialogProps {
 }
 
 export const ApiKeyDialog = ({ open, onOpenChange, onApiKeySet }: ApiKeyDialogProps) => {
-  const [apiKey, setApiKey] = useState("");
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [openaiKey, setOpenaiKey] = useState("");
+  const [geminiKey, setGeminiKey] = useState("");
+  const [showOpenaiKey, setShowOpenaiKey] = useState(false);
+  const [showGeminiKey, setShowGeminiKey] = useState(false);
+  const [isTestingOpenai, setIsTestingOpenai] = useState(false);
+  const [isTestingGemini, setIsTestingGemini] = useState(false);
+  const [openaiError, setOpenaiError] = useState("");
+  const [geminiError, setGeminiError] = useState("");
   const { toast } = useToast();
 
-  const handleSave = async () => {
-    if (!apiKey.trim()) {
-      setError("Please enter your OpenAI API key");
+  const handleSaveOpenai = async () => {
+    if (!openaiKey.trim()) {
+      setOpenaiError("Please enter your OpenAI API key");
       return;
     }
 
-    setIsLoading(true);
-    setError("");
+    setIsTestingOpenai(true);
+    setOpenaiError("");
 
     try {
-      const isValid = await OpenAIService.testApiKey(apiKey.trim());
+      const isValid = await OpenAIService.testApiKey(openaiKey.trim());
       
       if (isValid) {
-        OpenAIService.saveApiKey(apiKey.trim());
+        OpenAIService.saveApiKey(openaiKey.trim());
         toast({
           title: "Success",
           description: "OpenAI API key saved successfully!",
         });
         onApiKeySet();
         onOpenChange(false);
-        setApiKey("");
+        setOpenaiKey("");
       } else {
-        setError("Invalid API key. Please check and try again.");
+        setOpenaiError("Invalid API key. Please check and try again.");
       }
     } catch (error) {
-      setError("Failed to validate API key. Please try again.");
+      setOpenaiError("Failed to validate API key. Please try again.");
     } finally {
-      setIsLoading(false);
+      setIsTestingOpenai(false);
     }
   };
 
-  const handleClear = () => {
+  const handleSaveGemini = async () => {
+    if (!geminiKey.trim()) {
+      setGeminiError("Please enter your Gemini API key");
+      return;
+    }
+
+    setIsTestingGemini(true);
+    setGeminiError("");
+
+    try {
+      const isValid = await GeminiService.testApiKey(geminiKey.trim());
+      
+      if (isValid) {
+        GeminiService.saveApiKey(geminiKey.trim());
+        toast({
+          title: "Success",
+          description: "Gemini API key saved successfully!",
+        });
+        onApiKeySet();
+        onOpenChange(false);
+        setGeminiKey("");
+      } else {
+        setGeminiError("Invalid API key. Please check and try again.");
+      }
+    } catch (error) {
+      setGeminiError("Failed to validate API key. Please try again.");
+    } finally {
+      setIsTestingGemini(false);
+    }
+  };
+
+  const handleClearOpenai = () => {
     OpenAIService.clearApiKey();
     toast({
       title: "API Key Cleared",
       description: "OpenAI API key has been removed.",
     });
-    onOpenChange(false);
   };
 
-  const existingKey = OpenAIService.getApiKey();
+  const handleClearGemini = () => {
+    GeminiService.clearApiKey();
+    toast({
+      title: "API Key Cleared",
+      description: "Gemini API key has been removed.",
+    });
+  };
+
+  const existingOpenaiKey = OpenAIService.getApiKey();
+  const existingGeminiKey = GeminiService.getApiKey();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -76,99 +121,180 @@ export const ApiKeyDialog = ({ open, onOpenChange, onApiKeySet }: ApiKeyDialogPr
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Key className="h-5 w-5" />
-            OpenAI API Configuration
+            AI API Configuration
           </DialogTitle>
           <DialogDescription>
-            {existingKey 
-              ? "You have an API key configured. You can update it or clear it below."
-              : "Enter your OpenAI API key to enable intelligent responses for all questions."
-            }
+            Configure your AI API keys to enable intelligent responses. You can use OpenAI, Gemini, or both.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          {!existingKey && (
-            <Alert>
-              <AlertDescription>
-                Don't have an API key? Get one from{" "}
-                <a 
-                  href="https://platform.openai.com/api-keys" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-primary hover:underline"
-                >
-                  OpenAI Platform
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              </AlertDescription>
-            </Alert>
-          )}
+        <Tabs defaultValue="openai" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="openai" className="flex items-center gap-2">
+              OpenAI {existingOpenaiKey && "✓"}
+            </TabsTrigger>
+            <TabsTrigger value="gemini" className="flex items-center gap-2">
+              Gemini {existingGeminiKey && "✓"}
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="openai" className="space-y-4">
+            {!existingOpenaiKey && (
+              <Alert>
+                <AlertDescription>
+                  Get your API key from{" "}
+                  <a 
+                    href="https://platform.openai.com/api-keys" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                  >
+                    OpenAI Platform
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </AlertDescription>
+              </Alert>
+            )}
 
-          <div className="space-y-2">
-            <Label htmlFor="apikey">
-              {existingKey ? "New API Key" : "OpenAI API Key"}
-            </Label>
-            <div className="relative">
-              <Input
-                id="apikey"
-                type={showApiKey ? "text" : "password"}
-                placeholder={existingKey ? "Enter new API key..." : "sk-..."}
-                value={apiKey}
-                onChange={(e) => {
-                  setApiKey(e.target.value);
-                  setError("");
-                }}
-                className="pr-10"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                onClick={() => setShowApiKey(!showApiKey)}
+            <div className="space-y-2">
+              <Label htmlFor="openai-key">
+                {existingOpenaiKey ? "New OpenAI API Key" : "OpenAI API Key"}
+              </Label>
+              <div className="relative">
+                <Input
+                  id="openai-key"
+                  type={showOpenaiKey ? "text" : "password"}
+                  placeholder={existingOpenaiKey ? "Enter new API key..." : "sk-..."}
+                  value={openaiKey}
+                  onChange={(e) => {
+                    setOpenaiKey(e.target.value);
+                    setOpenaiError("");
+                  }}
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowOpenaiKey(!showOpenaiKey)}
+                >
+                  {showOpenaiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+
+            {openaiError && (
+              <Alert variant="destructive">
+                <AlertDescription>{openaiError}</AlertDescription>
+              </Alert>
+            )}
+
+            {existingOpenaiKey && (
+              <Alert>
+                <AlertDescription>
+                  Current API key: {existingOpenaiKey.substring(0, 7)}...{existingOpenaiKey.substring(existingOpenaiKey.length - 4)}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <div className="flex justify-between">
+              {existingOpenaiKey && (
+                <Button variant="outline" onClick={handleClearOpenai}>
+                  Clear
+                </Button>
+              )}
+              <Button 
+                onClick={handleSaveOpenai} 
+                disabled={isTestingOpenai || !openaiKey.trim()}
+                className="bg-gradient-to-r from-primary to-primary-glow ml-auto"
               >
-                {showApiKey ? (
-                  <EyeOff className="h-4 w-4" />
-                ) : (
-                  <Eye className="h-4 w-4" />
-                )}
+                {isTestingOpenai ? "Testing..." : existingOpenaiKey ? "Update" : "Save"}
               </Button>
             </div>
-          </div>
+          </TabsContent>
 
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+          <TabsContent value="gemini" className="space-y-4">
+            {!existingGeminiKey && (
+              <Alert>
+                <AlertDescription>
+                  Get your API key from{" "}
+                  <a 
+                    href="https://aistudio.google.com/app/apikey" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                  >
+                    Google AI Studio
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </AlertDescription>
+              </Alert>
+            )}
 
-          {existingKey && (
-            <Alert>
-              <AlertDescription>
-                Current API key: {existingKey.substring(0, 7)}...{existingKey.substring(existingKey.length - 4)}
-              </AlertDescription>
-            </Alert>
-          )}
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="gemini-key">
+                {existingGeminiKey ? "New Gemini API Key" : "Gemini API Key"}
+              </Label>
+              <div className="relative">
+                <Input
+                  id="gemini-key"
+                  type={showGeminiKey ? "text" : "password"}
+                  placeholder={existingGeminiKey ? "Enter new API key..." : "Enter your Gemini API key..."}
+                  value={geminiKey}
+                  onChange={(e) => {
+                    setGeminiKey(e.target.value);
+                    setGeminiError("");
+                  }}
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowGeminiKey(!showGeminiKey)}
+                >
+                  {showGeminiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
 
-        <DialogFooter className="flex justify-between">
-          {existingKey && (
-            <Button variant="outline" onClick={handleClear}>
-              Clear API Key
-            </Button>
-          )}
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleSave} 
-              disabled={isLoading || !apiKey.trim()}
-              className="bg-gradient-to-r from-primary to-primary-glow"
-            >
-              {isLoading ? "Validating..." : existingKey ? "Update" : "Save"}
-            </Button>
-          </div>
+            {geminiError && (
+              <Alert variant="destructive">
+                <AlertDescription>{geminiError}</AlertDescription>
+              </Alert>
+            )}
+
+            {existingGeminiKey && (
+              <Alert>
+                <AlertDescription>
+                  Current API key: {existingGeminiKey.substring(0, 7)}...{existingGeminiKey.substring(existingGeminiKey.length - 4)}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <div className="flex justify-between">
+              {existingGeminiKey && (
+                <Button variant="outline" onClick={handleClearGemini}>
+                  Clear
+                </Button>
+              )}
+              <Button 
+                onClick={handleSaveGemini} 
+                disabled={isTestingGemini || !geminiKey.trim()}
+                className="bg-gradient-to-r from-primary to-primary-glow ml-auto"
+              >
+                {isTestingGemini ? "Testing..." : existingGeminiKey ? "Update" : "Save"}
+              </Button>
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
